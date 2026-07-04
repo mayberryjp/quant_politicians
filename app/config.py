@@ -1,0 +1,67 @@
+"""Application settings loaded from environment variables.
+
+Mirrors the ``pydantic-settings`` pattern used in ``quant_signals``. Environment
+variable names match the House spec (docs/specs) so operators configure one set
+of well-known names.
+"""
+
+from __future__ import annotations
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+        populate_by_name=True,
+    )
+
+    # --- Infrastructure ---
+    redis_url: str = Field("redis://localhost:6379/0", validation_alias="QUANT_REDIS_URL")
+    database_url: str = Field("", validation_alias="DATABASE_URL")
+    api_port: int = Field(8017, validation_alias="API_PORT")
+    api_listen_address: str = Field("0.0.0.0", validation_alias="API_LISTEN_ADDRESS")
+
+    # --- Worker scheduling ---
+    poll_interval: int = Field(3600, validation_alias="POLL_INTERVAL")
+    heartbeat_ttl: int = Field(300, validation_alias="QP_HEARTBEAT_TTL")
+
+    # --- House data source ---
+    house_fd_base_url: str = Field(
+        "https://disclosures-clerk.house.gov", validation_alias="HOUSE_FD_BASE_URL"
+    )
+    house_fd_years: str = Field("current", validation_alias="HOUSE_FD_YEARS")
+    backfill_years: str = Field("", validation_alias="BACKFILL_YEARS")
+    target_filing_types: str = Field("P", validation_alias="TARGET_FILING_TYPES")
+    publish_transaction_types: str = Field("purchase", validation_alias="PUBLISH_TRANSACTION_TYPES")
+    historical_start_date: str = Field("", validation_alias="HISTORICAL_START_DATE")
+
+    # --- Ollama (vision-capable model REQUIRED, no default) ---
+    ollama_url: str = Field("http://localhost:11434", validation_alias="OLLAMA_URL")
+    ollama_model: str = Field("", validation_alias="OLLAMA_MODEL")
+    ollama_timeout: int = Field(180, validation_alias="OLLAMA_TIMEOUT")
+
+    # --- quant_signals producer ---
+    signals_api_url: str = Field("", validation_alias="SIGNALS_API_URL")
+    signals_source_name: str = Field("house-disclosures-v1", validation_alias="SIGNALS_SOURCE_NAME")
+
+    # --- HTTP / limits ---
+    http_user_agent: str = Field(
+        "quant_politicians/0.1 (+https://github.com/mayberryjp/quant_politicians)",
+        validation_alias="HTTP_USER_AGENT",
+    )
+    max_doc_bytes: int = Field(52_428_800, validation_alias="MAX_DOC_BYTES")
+    max_doc_pages: int = Field(20, validation_alias="MAX_DOC_PAGES")
+
+    def parsed_target_filing_types(self) -> list[str]:
+        return [t.strip().upper() for t in self.target_filing_types.split(",") if t.strip()]
+
+    def parsed_publish_transaction_types(self) -> list[str]:
+        return [t.strip().lower() for t in self.publish_transaction_types.split(",") if t.strip()]
+
+
+settings = Settings()
