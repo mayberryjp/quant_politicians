@@ -54,6 +54,13 @@ class StateRepository:
             result[name] = int(val) if val else 0
         return result
 
+    # --- Backfill tracking ---
+    def get_backfill_done(self, worker: str) -> set[str]:
+        return set(self.r.smembers(keys.backfill_done_key(worker)))
+
+    def mark_backfill_done(self, worker: str, year: int) -> None:
+        self.r.sadd(keys.backfill_done_key(worker), str(year))
+
     # --- Single-flight lock (used from Slice 6 onward) ---
     def acquire_lock(self, worker: str, ttl: int) -> bool:
         return bool(self.r.set(keys.lock_key(worker), _now_iso(), nx=True, ex=ttl))
