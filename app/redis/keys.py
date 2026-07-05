@@ -41,10 +41,15 @@ def lock_key(worker: str) -> str:
     return _p(worker, "lock", "poll")
 
 
+def backfill_done_key(worker: str) -> str:
+    return _p(worker, "backfill", "done")
+
+
 # Counter names surfaced by the House worker and the /stats endpoint.
 HOUSE_COUNTERS = [
     "filings_seen",
     "new_filings",
+    "malformed",
     "docs_fetched",
     "pages_rendered",
     "extraction_ok",
