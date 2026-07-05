@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     max_doc_bytes: int = Field(52_428_800, validation_alias="MAX_DOC_BYTES")
     max_doc_pages: int = Field(20, validation_alias="MAX_DOC_PAGES")
 
+    # --- Document retrieval ---
+    doc_cache_dir: str = Field("/var/cache/quant_politicians", validation_alias="DOC_CACHE_DIR")
+    fetch_batch_size: int = Field(50, validation_alias="FETCH_BATCH_SIZE")
+    fetch_max_attempts: int = Field(3, validation_alias="FETCH_MAX_ATTEMPTS")
+    fetch_backoff_seconds: float = Field(2.0, validation_alias="FETCH_BACKOFF_SECONDS")
+
     def parsed_target_filing_types(self) -> list[str]:
         return [t.strip().upper() for t in self.target_filing_types.split(",") if t.strip()]
 

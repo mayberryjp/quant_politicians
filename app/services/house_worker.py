@@ -16,12 +16,14 @@ import argparse
 import logging
 import sys
 import time
+from pathlib import Path
 
 from app.config import settings
 from app.db import get_engine
 from app.dependencies import get_repo
 from app.redis.repository import StateRepository
 from app.repository.house_filings import HouseFilingsRepository
+from app.services.house_documents import retrieve_documents
 from app.services.house_index import run_house_ingest_cycle
 
 WORKER = "house"
@@ -49,6 +51,14 @@ def run_cycle(repo: StateRepository, *, filings_repo=None, download_fn=None, now
                 "house cycle: seen=%d new=%d malformed=%d years=%s",
                 summary.filings_seen, summary.new_filings,
                 summary.malformed, summary.years_processed,
+            )
+            retrieval = retrieve_documents(
+                filings_repo=filings_repo, state_repo=repo,
+                cache_dir=Path(settings.doc_cache_dir),
+            )
+            logger.info(
+                "house retrieval: considered=%d fetched=%d failed=%d",
+                retrieval.considered, retrieval.fetched, retrieval.failed,
             )
         except Exception:
             repo.incr_counter(WORKER, "failed")
