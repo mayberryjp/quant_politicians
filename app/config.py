@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     fetch_max_attempts: int = Field(3, validation_alias="FETCH_MAX_ATTEMPTS")
     fetch_backoff_seconds: float = Field(2.0, validation_alias="FETCH_BACKOFF_SECONDS")
 
+    # --- LLM extraction ---
+    extract_batch_size: int = Field(25, validation_alias="EXTRACT_BATCH_SIZE")
+    llm_max_attempts: int = Field(3, validation_alias="LLM_MAX_ATTEMPTS")
+    render_scale: float = Field(2.0, validation_alias="RENDER_SCALE")
+
     def parsed_target_filing_types(self) -> list[str]:
         return [t.strip().upper() for t in self.target_filing_types.split(",") if t.strip()]
 
