@@ -18,12 +18,14 @@ import argparse
 import logging
 import sys
 import time
+from pathlib import Path
 
 from app.config import settings
 from app.db import get_engine
 from app.dependencies import get_repo
 from app.redis.repository import StateRepository
 from app.repository.senate_filings import SenateFilingsRepository
+from app.services.senate_documents import retrieve_reports
 from app.services.senate_efd import EfdSession
 from app.services.senate_search import run_search_ingest_cycle
 
@@ -43,6 +45,14 @@ def run_cycle(state_repo: StateRepository, *, session=None, filings_repo=None, n
             logger.info(
                 "senate search: seen=%d new=%d backfill=%s window_start=%s",
                 summary.seen, summary.new, summary.is_backfill, summary.start_date,
+            )
+            retrieval = retrieve_reports(
+                session=session, filings_repo=filings_repo, state_repo=state_repo,
+                cache_dir=Path(settings.doc_cache_dir),
+            )
+            logger.info(
+                "senate retrieval: considered=%d fetched=%d failed=%d",
+                retrieval.considered, retrieval.fetched, retrieval.failed,
             )
         else:
             logger.info("no session/filings repo provided; heartbeat-only cycle")

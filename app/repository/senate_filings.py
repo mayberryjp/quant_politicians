@@ -59,3 +59,39 @@ class SenateFilingsRepository:
         with self.engine.begin() as conn:
             for filing in filings:
                 conn.execute(_UPSERT, _params(filing))
+
+    def get_reports_for_retrieval(self, limit: int) -> list[tuple[str, str, bool]]:
+        sql = text(
+            """
+            SELECT report_uuid, report_url, is_paper
+            FROM disclosures.senate_filings
+            WHERE status = 'new' AND report_url IS NOT NULL
+            ORDER BY filed_date DESC NULLS LAST
+            LIMIT :limit
+            """
+        )
+        with self.engine.connect() as conn:
+            return [(r[0], r[1], r[2]) for r in conn.execute(sql, {"limit": limit}).all()]
+
+    def mark_fetched(self, report_uuid: str, content_sha256: str, page_count) -> None:
+        sql = text(
+            """
+            UPDATE disclosures.senate_filings
+            SET status = 'fetched', content_sha256 = :sha, page_count = :pages, updated_at = now()
+            WHERE report_uuid = :uuid
+            """
+        )
+        with self.engine.begin() as conn:
+            conn.execute(sql, {"uuid": report_uuid, "sha": content_sha256, "pages": page_count})
+
+    def mark_failed(self, report_uuid: str, error: str) -> None:
+        sql = text(
+            """
+            UPDATE disclosures.senate_filings
+            SET status = 'failed', last_error = :err,
+                fetch_attempts = fetch_attempts + 1, updated_at = now()
+            WHERE report_uuid = :uuid
+            """
+        )
+        with self.engine.begin() as conn:
+            conn.execute(sql, {"uuid": report_uuid, "err": error})
