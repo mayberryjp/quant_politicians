@@ -20,17 +20,35 @@ import sys
 import time
 
 from app.config import settings
+from app.db import get_engine
 from app.dependencies import get_repo
 from app.redis.repository import StateRepository
+from app.repository.senate_filings import SenateFilingsRepository
+from app.services.senate_efd import EfdSession
+from app.services.senate_search import run_search_ingest_cycle
 
 WORKER = "senate"
 logger = logging.getLogger("quant_politicians.senate")
 
 
-def run_cycle(state_repo: StateRepository) -> None:
-    """Slice 0: heartbeat-only cycle. Later slices extend the pipeline."""
+def run_cycle(state_repo: StateRepository, *, session=None, filings_repo=None, now=None) -> None:
+    """Heartbeat, then (when a session + filings repo are provided) run eFD search
+    ingestion. With no deps the cycle is heartbeat-only (Slice 0 behavior / no DB)."""
     state_repo.set_heartbeat(WORKER)
-    logger.info("senate worker cycle complete (scaffold no-op)")
+    try:
+        if session is not None and filings_repo is not None:
+            summary = run_search_ingest_cycle(
+                session=session, filings_repo=filings_repo, state_repo=state_repo, now=now,
+            )
+            logger.info(
+                "senate search: seen=%d new=%d backfill=%s window_start=%s",
+                summary.seen, summary.new, summary.is_backfill, summary.start_date,
+            )
+        else:
+            logger.info("no session/filings repo provided; heartbeat-only cycle")
+    except Exception:
+        state_repo.incr_counter(WORKER, "failed")
+        logger.exception("senate cycle failed")
     state_repo.set_last_run(WORKER)
 
 
@@ -40,7 +58,13 @@ def _execute_cycle() -> None:
         logger.warning("another senate cycle holds the lock; skipping this tick")
         return
     try:
-        run_cycle(state_repo)
+        if not settings.database_url:
+            logger.warning("DATABASE_URL not configured; ingestion disabled")
+            run_cycle(state_repo)
+            return
+        engine = get_engine()
+        session = EfdSession(state_repo=state_repo)
+        run_cycle(state_repo, session=session, filings_repo=SenateFilingsRepository(engine))
     finally:
         state_repo.release_lock(WORKER)
 

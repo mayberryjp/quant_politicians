@@ -90,5 +90,13 @@ class Settings(BaseSettings):
     def parsed_publish_transaction_types(self) -> list[str]:
         return [t.strip().lower() for t in self.publish_transaction_types.split(",") if t.strip()]
 
+    def parsed_senate_report_types(self) -> list[str]:
+        return [t.strip() for t in self.senate_report_types.split(",") if t.strip()]
+
+    def parsed_senate_filer_types(self) -> list[str]:
+        if self.senate_filer_types.strip().lower() in ("", "all"):
+            return []
+        return [t.strip() for t in self.senate_filer_types.split(",") if t.strip()]
+
 
 settings = Settings()
