@@ -24,16 +24,19 @@ from app.config import settings
 from app.db import get_engine
 from app.dependencies import get_repo
 from app.redis.repository import StateRepository
+from app.repository.senate_extractions import SenateExtractionsRepository
 from app.repository.senate_filings import SenateFilingsRepository
 from app.services.senate_documents import retrieve_reports
 from app.services.senate_efd import EfdSession
+from app.services.senate_extract import extract_reports
 from app.services.senate_search import run_search_ingest_cycle
+from app.services.ollama_client import OllamaClient
 
 WORKER = "senate"
 logger = logging.getLogger("quant_politicians.senate")
 
 
-def run_cycle(state_repo: StateRepository, *, session=None, filings_repo=None, now=None) -> None:
+def run_cycle(state_repo: StateRepository, *, session=None, filings_repo=None, extractions_repo=None, llm=None, now=None) -> None:
     """Heartbeat, then (when a session + filings repo are provided) run eFD search
     ingestion. With no deps the cycle is heartbeat-only (Slice 0 behavior / no DB)."""
     state_repo.set_heartbeat(WORKER)
@@ -54,12 +57,28 @@ def run_cycle(state_repo: StateRepository, *, session=None, filings_repo=None, n
                 "senate retrieval: considered=%d fetched=%d failed=%d",
                 retrieval.considered, retrieval.fetched, retrieval.failed,
             )
+            if extractions_repo is not None and llm is not None:
+                extraction = extract_reports(
+                    filings_repo=filings_repo, extractions_repo=extractions_repo,
+                    state_repo=state_repo, cache_dir=Path(settings.doc_cache_dir), llm=llm,
+                )
+                logger.info(
+                    "senate extraction: docs=%d trades=%d mismatches=%d failed=%d",
+                    extraction.extracted_docs, extraction.trades, extraction.mismatches, extraction.failed,
+                )
         else:
             logger.info("no session/filings repo provided; heartbeat-only cycle")
     except Exception:
         state_repo.incr_counter(WORKER, "failed")
         logger.exception("senate cycle failed")
     state_repo.set_last_run(WORKER)
+
+
+def _build_llm():
+    if not settings.ollama_model:
+        logger.warning("OLLAMA_MODEL not set; extraction disabled")
+        return None
+    return OllamaClient(settings.ollama_url, settings.ollama_model, settings.ollama_timeout)
 
 
 def _execute_cycle() -> None:
@@ -74,7 +93,12 @@ def _execute_cycle() -> None:
             return
         engine = get_engine()
         session = EfdSession(state_repo=state_repo)
-        run_cycle(state_repo, session=session, filings_repo=SenateFilingsRepository(engine))
+        run_cycle(
+            state_repo, session=session,
+            filings_repo=SenateFilingsRepository(engine),
+            extractions_repo=SenateExtractionsRepository(engine),
+            llm=_build_llm(),
+        )
     finally:
         state_repo.release_lock(WORKER)
 

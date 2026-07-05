@@ -20,6 +20,7 @@ dependencies = [
     "pypdfium2>=4.30",
     "defusedxml>=0.7",
     "Pillow>=10.0",
+    "beautifulsoup4>=4.12",
 ]
 
 [project.optional-dependencies]

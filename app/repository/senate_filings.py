@@ -95,3 +95,23 @@ class SenateFilingsRepository:
         )
         with self.engine.begin() as conn:
             conn.execute(sql, {"uuid": report_uuid, "err": error})
+
+    def get_reports_for_extraction(self, limit: int) -> list[tuple[str, str | None, bool]]:
+        sql = text(
+            """
+            SELECT report_uuid, content_sha256, is_paper
+            FROM disclosures.senate_filings
+            WHERE status = 'fetched'
+            ORDER BY filed_date DESC NULLS LAST
+            LIMIT :limit
+            """
+        )
+        with self.engine.connect() as conn:
+            return [(r[0], r[1], r[2]) for r in conn.execute(sql, {"limit": limit}).all()]
+
+    def mark_extracted(self, report_uuid: str) -> None:
+        sql = text(
+            "UPDATE disclosures.senate_filings SET status='extracted', updated_at=now() WHERE report_uuid=:uuid"
+        )
+        with self.engine.begin() as conn:
+            conn.execute(sql, {"uuid": report_uuid})
