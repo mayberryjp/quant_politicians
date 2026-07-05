@@ -60,3 +60,47 @@ class HouseFilingsRepository:
         with self.engine.begin() as conn:
             for filing in filings:
                 conn.execute(_UPSERT, _params(filing))
+
+    def get_filings_for_retrieval(self, filing_types: list[str], limit: int) -> list[HouseFiling]:
+        """Return ``new`` filings whose type is in the allowlist (targets to fetch)."""
+        if not filing_types:
+            return []
+        sql = text(
+            """
+            SELECT doc_id, year, filing_type
+            FROM disclosures.house_filings
+            WHERE status = 'new' AND filing_type = ANY(:types)
+            ORDER BY filing_date DESC NULLS LAST
+            LIMIT :limit
+            """
+        )
+        with self.engine.connect() as conn:
+            rows = conn.execute(sql, {"types": list(filing_types), "limit": limit}).mappings().all()
+        return [
+            HouseFiling(doc_id=r["doc_id"], year=r["year"], filing_type=r["filing_type"])
+            for r in rows
+        ]
+
+    def mark_fetched(self, doc_id: str, doc_url: str, doc_sha256: str, page_count: int) -> None:
+        sql = text(
+            """
+            UPDATE disclosures.house_filings
+            SET status = 'fetched', doc_url = :doc_url, doc_sha256 = :sha,
+                page_count = :pages, updated_at = now()
+            WHERE doc_id = :doc_id
+            """
+        )
+        with self.engine.begin() as conn:
+            conn.execute(sql, {"doc_id": doc_id, "doc_url": doc_url, "sha": doc_sha256, "pages": page_count})
+
+    def mark_failed(self, doc_id: str, error: str) -> None:
+        sql = text(
+            """
+            UPDATE disclosures.house_filings
+            SET status = 'failed', last_error = :err,
+                fetch_attempts = fetch_attempts + 1, updated_at = now()
+            WHERE doc_id = :doc_id
+            """
+        )
+        with self.engine.begin() as conn:
+            conn.execute(sql, {"doc_id": doc_id, "err": error})
