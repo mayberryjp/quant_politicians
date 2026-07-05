@@ -65,8 +65,9 @@ def run_cycle(state_repo: StateRepository, *, session=None, filings_repo=None, e
                     state_repo=state_repo, cache_dir=Path(settings.doc_cache_dir), llm=llm,
                 )
                 logger.info(
-                    "senate extraction: docs=%d trades=%d mismatches=%d failed=%d",
-                    extraction.extracted_docs, extraction.trades, extraction.mismatches, extraction.failed,
+                    "senate extraction: docs=%d trades=%d purchases=%d pages=%d mismatches=%d failed=%d",
+                    extraction.extracted_docs, extraction.trades, extraction.purchases,
+                    extraction.pages_rendered, extraction.mismatches, extraction.failed,
                 )
             if extractions_repo is not None and signals_client is not None:
                 publish = publish_signals(

@@ -74,6 +74,8 @@ class ExtractSummary:
     considered: int = 0
     extracted_docs: int = 0
     trades: int = 0
+    purchases: int = 0
+    pages_rendered: int = 0
     mismatches: int = 0
     failed: int = 0
 
@@ -95,6 +97,7 @@ def extract_reports(
         try:
             if is_paper:
                 images = renderer(load_cached_report(cache_dir, sha, "pdf"), settings.max_doc_pages)
+                summary.pages_rendered += len(images)
                 trades = extract_trades_from_images(images, llm=llm, max_attempts=max_attempts)
                 html_tickers: set[str] = set()
             else:
@@ -118,6 +121,7 @@ def extract_reports(
             filings_repo.mark_extracted(report_uuid)
             summary.extracted_docs += 1
             summary.trades += len(trades)
+            summary.purchases += sum(1 for t in trades if t.transaction_type == "purchase")
             state_repo.incr_counter(WORKER, "extraction_ok")
             logger.info("extracted senate report %s: %d trades", report_uuid, len(trades))
         except Exception as exc:  # noqa: BLE001 - isolated per report
@@ -126,6 +130,10 @@ def extract_reports(
             state_repo.incr_counter(WORKER, "extraction_failed")
             logger.exception("senate extraction failed for %s", report_uuid)
 
+    if summary.pages_rendered:
+        state_repo.incr_counter(WORKER, "pages_rendered", summary.pages_rendered)
+    if summary.purchases:
+        state_repo.incr_counter(WORKER, "purchases_extracted", summary.purchases)
     if summary.mismatches:
         state_repo.incr_counter(WORKER, "ticker_mismatches", summary.mismatches)
     return summary
