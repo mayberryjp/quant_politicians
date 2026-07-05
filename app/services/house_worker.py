@@ -117,19 +117,25 @@ def _build_signals_client():
 
 def _execute_cycle() -> None:
     state_repo = get_repo()
-    if not settings.database_url:
-        logger.warning("DATABASE_URL not configured; ingestion disabled")
-        run_cycle(state_repo)
+    if not state_repo.acquire_lock(WORKER, settings.lock_ttl):
+        logger.warning("another house cycle holds the lock; skipping this tick")
         return
-    engine = get_engine()
-    run_cycle(
-        state_repo,
-        filings_repo=HouseFilingsRepository(engine),
-        extractions_repo=HouseExtractionsRepository(engine),
-        llm=_build_llm(),
-        signals_client=_build_signals_client(),
-        cache_dir=Path(settings.doc_cache_dir),
-    )
+    try:
+        if not settings.database_url:
+            logger.warning("DATABASE_URL not configured; ingestion disabled")
+            run_cycle(state_repo)
+            return
+        engine = get_engine()
+        run_cycle(
+            state_repo,
+            filings_repo=HouseFilingsRepository(engine),
+            extractions_repo=HouseExtractionsRepository(engine),
+            llm=_build_llm(),
+            signals_client=_build_signals_client(),
+            cache_dir=Path(settings.doc_cache_dir),
+        )
+    finally:
+        state_repo.release_lock(WORKER)
 
 
 def worker_loop(interval: int) -> None:

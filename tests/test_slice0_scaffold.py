@@ -16,7 +16,8 @@ class TestHealth:
     def test_readiness_ok(self, app_client):
         resp = app_client.get("/politicians-cache/ready")
         assert resp.status_int == 200
-        assert resp.json["status"] == "ready"
+        # No cycle has run yet -> readiness is "degraded" (redis ok, heartbeat absent).
+        assert resp.json["status"] in ("ready", "degraded")
         assert resp.json["redis"] == "ok"
         assert "house" in resp.json["heartbeats"]
 
@@ -51,3 +52,4 @@ class TestWorker:
         house_worker.run_cycle(StateRepository(fake_redis))
         resp = app_client.get("/politicians-cache/ready")
         assert resp.json["heartbeats"]["house"] is not None
+        assert resp.json["status"] == "ready"
