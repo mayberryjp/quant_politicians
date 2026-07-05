@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     database_url: str = Field("", validation_alias="DATABASE_URL")
     api_port: int = Field(8017, validation_alias="API_PORT")
     api_listen_address: str = Field("0.0.0.0", validation_alias="API_LISTEN_ADDRESS")
+    max_page_size: int = Field(100, validation_alias="MAX_PAGE_SIZE")
+    default_page_size: int = Field(25, validation_alias="DEFAULT_PAGE_SIZE")
 
     # --- Worker scheduling ---
     poll_interval: int = Field(3600, validation_alias="POLL_INTERVAL")
