@@ -6,6 +6,7 @@ persistence (filings/extractions) lives in Postgres and is added in later slices
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 import redis as redis_lib
@@ -60,6 +61,14 @@ class StateRepository:
 
     def mark_backfill_done(self, worker: str, year: int) -> None:
         self.r.sadd(keys.backfill_done_key(worker), str(year))
+
+    # --- Session persistence (eFD) ---
+    def set_session(self, worker: str, data: dict, ttl: int = 1800) -> None:
+        self.r.set(keys.session_key(worker), json.dumps(data), ex=ttl)
+
+    def get_session(self, worker: str) -> dict | None:
+        raw = self.r.get(keys.session_key(worker))
+        return json.loads(raw) if raw else None
 
     # --- Single-flight lock (used from Slice 6 onward) ---
     def acquire_lock(self, worker: str, ttl: int) -> bool:

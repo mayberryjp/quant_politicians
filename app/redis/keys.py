@@ -45,6 +45,10 @@ def backfill_done_key(worker: str) -> str:
     return _p(worker, "backfill", "done")
 
 
+def session_key(worker: str) -> str:
+    return _p(worker, "session")
+
+
 # Counter names surfaced by the House worker and the /stats endpoint.
 HOUSE_COUNTERS = [
     "filings_seen",
