@@ -104,3 +104,24 @@ class HouseFilingsRepository:
         )
         with self.engine.begin() as conn:
             conn.execute(sql, {"doc_id": doc_id, "err": error})
+
+    def get_filings_for_extraction(self, limit: int) -> list[tuple[str, str | None]]:
+        """Return (doc_id, doc_sha256) for filings ready to extract (status='fetched')."""
+        sql = text(
+            """
+            SELECT doc_id, doc_sha256
+            FROM disclosures.house_filings
+            WHERE status = 'fetched'
+            ORDER BY filing_date DESC NULLS LAST
+            LIMIT :limit
+            """
+        )
+        with self.engine.connect() as conn:
+            return [(r[0], r[1]) for r in conn.execute(sql, {"limit": limit}).all()]
+
+    def mark_extracted(self, doc_id: str) -> None:
+        sql = text(
+            "UPDATE disclosures.house_filings SET status='extracted', updated_at=now() WHERE doc_id=:doc_id"
+        )
+        with self.engine.begin() as conn:
+            conn.execute(sql, {"doc_id": doc_id})

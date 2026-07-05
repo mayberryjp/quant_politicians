@@ -22,63 +22,98 @@ from app.config import settings
 from app.db import get_engine
 from app.dependencies import get_repo
 from app.redis.repository import StateRepository
+from app.repository.house_extractions import HouseExtractionsRepository
 from app.repository.house_filings import HouseFilingsRepository
 from app.services.house_documents import retrieve_documents
+from app.services.house_extract import extract_documents
 from app.services.house_index import run_house_ingest_cycle
+from app.services.ollama_client import OllamaClient
 
 WORKER = "house"
 logger = logging.getLogger("quant_politicians.house")
 
 
-def run_cycle(repo: StateRepository, *, filings_repo=None, download_fn=None, now=None):
-    """Execute a single worker cycle.
+def run_cycle(
+    state_repo: StateRepository,
+    *,
+    filings_repo=None,
+    extractions_repo=None,
+    llm=None,
+    download_fn=None,
+    cache_dir=None,
+    now=None,
+):
+    """Run one worker cycle: heartbeat -> ingest -> retrieve -> extract -> last_run.
 
-    Writes a heartbeat, runs House index ingestion (Slice 1), and records the
-    last-run timestamp. Ingestion is skipped with a warning when ``DATABASE_URL``
-    is not configured so the worker still heartbeats in constrained environments.
+    Each stage runs only when its dependency is provided; with no ``filings_repo``
+    the cycle is heartbeat-only (constrained environments and Slice 0 tests).
     """
-    repo.set_heartbeat(WORKER)
-    summary = None
-    if filings_repo is None:
-        logger.info("no filings repository provided; heartbeat-only cycle")
-    else:
-        try:
-            summary = run_house_ingest_cycle(
-                filings_repo=filings_repo, state_repo=repo,
+    state_repo.set_heartbeat(WORKER)
+    cache_dir = Path(cache_dir or settings.doc_cache_dir)
+    try:
+        if filings_repo is None:
+            logger.info("no filings repository provided; heartbeat-only cycle")
+        else:
+            ingest = run_house_ingest_cycle(
+                filings_repo=filings_repo, state_repo=state_repo,
                 download_fn=download_fn, now=now,
             )
             logger.info(
-                "house cycle: seen=%d new=%d malformed=%d years=%s",
-                summary.filings_seen, summary.new_filings,
-                summary.malformed, summary.years_processed,
+                "house ingest: seen=%d new=%d malformed=%d years=%s",
+                ingest.filings_seen, ingest.new_filings, ingest.malformed, ingest.years_processed,
             )
             retrieval = retrieve_documents(
-                filings_repo=filings_repo, state_repo=repo,
-                cache_dir=Path(settings.doc_cache_dir),
+                filings_repo=filings_repo, state_repo=state_repo, cache_dir=cache_dir,
             )
             logger.info(
                 "house retrieval: considered=%d fetched=%d failed=%d",
                 retrieval.considered, retrieval.fetched, retrieval.failed,
             )
-        except Exception:
-            repo.incr_counter(WORKER, "failed")
-            logger.exception("house ingest cycle failed")
-    repo.set_last_run(WORKER)
-    return summary
+            if extractions_repo is not None and llm is not None:
+                extraction = extract_documents(
+                    filings_repo=filings_repo, extractions_repo=extractions_repo,
+                    state_repo=state_repo, cache_dir=cache_dir, llm=llm,
+                )
+                logger.info(
+                    "house extraction: docs=%d trades=%d failed=%d",
+                    extraction.extracted_docs, extraction.trades, extraction.failed,
+                )
+            else:
+                logger.info("extraction skipped (OLLAMA_MODEL / extractions repo unavailable)")
+    except Exception:
+        state_repo.incr_counter(WORKER, "failed")
+        logger.exception("house cycle failed")
+    state_repo.set_last_run(WORKER)
 
 
-def _build_filings_repo() -> HouseFilingsRepository | None:
+def _build_llm():
+    if not settings.ollama_model:
+        logger.warning("OLLAMA_MODEL not set; extraction disabled")
+        return None
+    return OllamaClient(settings.ollama_url, settings.ollama_model, settings.ollama_timeout)
+
+
+def _execute_cycle() -> None:
+    state_repo = get_repo()
     if not settings.database_url:
         logger.warning("DATABASE_URL not configured; ingestion disabled")
-        return None
-    return HouseFilingsRepository(get_engine())
+        run_cycle(state_repo)
+        return
+    engine = get_engine()
+    run_cycle(
+        state_repo,
+        filings_repo=HouseFilingsRepository(engine),
+        extractions_repo=HouseExtractionsRepository(engine),
+        llm=_build_llm(),
+        cache_dir=Path(settings.doc_cache_dir),
+    )
 
 
 def worker_loop(interval: int) -> None:
     logger.info("House worker starting (interval=%ds)", interval)
     while True:
         try:
-            run_cycle(get_repo(), filings_repo=_build_filings_repo())
+            _execute_cycle()
         except Exception:
             logger.exception("House cycle failed - will retry next cycle")
         time.sleep(interval)
@@ -100,7 +135,7 @@ def run_worker() -> None:
     args = parser.parse_args()
 
     if args.once:
-        run_cycle(get_repo(), filings_repo=_build_filings_repo())
+        _execute_cycle()
         logger.info("Single pass complete")
     else:
         worker_loop(args.schedule)
