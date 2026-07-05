@@ -9,7 +9,7 @@ from app.redis import keys
 
 sub = Bottle()
 
-WORKERS = ["house"]
+WORKERS = ["house", "senate"]
 
 
 @sub.get("/politicians-cache/health")
@@ -45,4 +45,7 @@ def stats():
     house = repo.get_counters("house", keys.HOUSE_COUNTERS)
     house["last_run"] = repo.get_last_run("house")
     house["heartbeat"] = repo.get_heartbeat("house")
-    return {"house": house}
+    senate = repo.get_counters("senate", keys.SENATE_COUNTERS)
+    senate["last_run"] = repo.get_last_run("senate")
+    senate["heartbeat"] = repo.get_heartbeat("senate")
+    return {"house": house, "senate": senate}

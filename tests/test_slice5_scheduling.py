@@ -46,6 +46,8 @@ class TestReadiness:
         assert resp.json["status"] == "degraded"  # no cycle -> heartbeat absent
 
     def test_ready_after_cycle(self, app_client, fake_redis):
-        house_worker.run_cycle(StateRepository(fake_redis))
+        repo = StateRepository(fake_redis)
+        house_worker.run_cycle(repo)
+        repo.set_heartbeat("senate")
         resp = app_client.get("/politicians-cache/ready")
         assert resp.json["status"] == "ready"

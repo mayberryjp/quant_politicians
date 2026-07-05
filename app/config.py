@@ -76,6 +76,14 @@ class Settings(BaseSettings):
     llm_max_attempts: int = Field(3, validation_alias="LLM_MAX_ATTEMPTS")
     render_scale: float = Field(2.0, validation_alias="RENDER_SCALE")
 
+    # --- Senate data source (eFD) ---
+    senate_efd_base_url: str = Field("https://efdsearch.senate.gov", validation_alias="SENATE_EFD_BASE_URL")
+    senate_report_types: str = Field("", validation_alias="SENATE_REPORT_TYPES")
+    senate_filer_types: str = Field("all", validation_alias="SENATE_FILER_TYPES")
+    senate_backfill_start_date: str = Field("", validation_alias="SENATE_BACKFILL_START_DATE")
+    senate_search_page_size: int = Field(100, validation_alias="SENATE_SEARCH_PAGE_SIZE")
+    senate_request_delay: float = Field(2.0, validation_alias="SENATE_REQUEST_DELAY")
+
     def parsed_target_filing_types(self) -> list[str]:
         return [t.strip().upper() for t in self.target_filing_types.split(",") if t.strip()]
 

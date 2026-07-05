@@ -49,7 +49,9 @@ class TestWorker:
         assert repo.get_last_run("house") is not None
 
     def test_ready_reflects_heartbeat_after_cycle(self, app_client, fake_redis):
-        house_worker.run_cycle(StateRepository(fake_redis))
+        repo = StateRepository(fake_redis)
+        house_worker.run_cycle(repo)
+        repo.set_heartbeat("senate")  # both workers must be alive for "ready"
         resp = app_client.get("/politicians-cache/ready")
         assert resp.json["heartbeats"]["house"] is not None
         assert resp.json["status"] == "ready"

@@ -60,3 +60,19 @@ HOUSE_COUNTERS = [
     "signals_unresolved",
     "failed",
 ]
+
+# Counter names surfaced by the Senate worker and the /stats endpoint.
+SENATE_COUNTERS = [
+    "reports_seen",
+    "new_reports",
+    "reports_fetched",
+    "pages_rendered",
+    "extraction_ok",
+    "extraction_failed",
+    "purchases_extracted",
+    "ticker_mismatches",
+    "signals_posted",
+    "signals_duplicate",
+    "signals_unresolved",
+    "failed",
+]
