@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from app.models.house import HouseFiling
+from app.repository import row_to_dict
 
 log = logging.getLogger("quant_politicians.house.repo")
 
@@ -125,3 +126,39 @@ class HouseFilingsRepository:
         )
         with self.engine.begin() as conn:
             conn.execute(sql, {"doc_id": doc_id})
+
+    def list_filings(self, *, status=None, filing_type=None, year=None, page=1, page_size=25):
+        clauses, params = [], {}
+        if status:
+            clauses.append("status = :status")
+            params["status"] = status
+        if filing_type:
+            clauses.append("filing_type = :ft")
+            params["ft"] = filing_type
+        if year is not None:
+            clauses.append("year = :year")
+            params["year"] = year
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        with self.engine.connect() as conn:
+            total = conn.execute(
+                text(f"SELECT count(*) FROM disclosures.house_filings {where}"), params
+            ).scalar_one()
+            page_params = {**params, "limit": page_size, "offset": (page - 1) * page_size}
+            rows = conn.execute(
+                text(
+                    "SELECT doc_id, prefix, last_name, first_name, suffix, filing_type, state_dst, "
+                    "year, filing_date, status, doc_url, doc_sha256, page_count, fetch_attempts, "
+                    f"last_error, first_seen_at, updated_at FROM disclosures.house_filings {where} "
+                    "ORDER BY filing_date DESC NULLS LAST, doc_id LIMIT :limit OFFSET :offset"
+                ),
+                page_params,
+            ).mappings().all()
+        return [row_to_dict(r) for r in rows], total
+
+    def get_filing(self, doc_id: str):
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM disclosures.house_filings WHERE doc_id = :doc_id"),
+                {"doc_id": doc_id},
+            ).mappings().first()
+        return row_to_dict(row) if row else None

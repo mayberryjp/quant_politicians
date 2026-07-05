@@ -10,7 +10,7 @@ from bottle import Bottle
 
 from app.config import settings
 from app.redis.client import close_redis
-from app.routes import health
+from app.routes import health, house
 
 SERVICE_NAME = "quant-politicians-api"
 log = logging.getLogger(SERVICE_NAME)
@@ -24,6 +24,7 @@ logging.basicConfig(
 
 app = Bottle()
 app.merge(health.sub)
+app.merge(house.sub)
 
 atexit.register(close_redis)
 
