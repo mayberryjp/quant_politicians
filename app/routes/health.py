@@ -25,8 +25,15 @@ def readiness():
     except Exception:
         redis_ok = False
     heartbeats = {w: repo.get_heartbeat(w) for w in WORKERS} if redis_ok else {}
+    workers_healthy = redis_ok and all(heartbeats.get(w) for w in WORKERS)
+    if not redis_ok:
+        status = "not_ready"
+    elif workers_healthy:
+        status = "ready"
+    else:
+        status = "degraded"
     return {
-        "status": "ready" if redis_ok else "not_ready",
+        "status": status,
         "redis": "ok" if redis_ok else "unavailable",
         "heartbeats": heartbeats,
     }

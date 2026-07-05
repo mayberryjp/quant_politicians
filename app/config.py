@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     # --- Worker scheduling ---
     poll_interval: int = Field(3600, validation_alias="POLL_INTERVAL")
     heartbeat_ttl: int = Field(300, validation_alias="QP_HEARTBEAT_TTL")
+    lock_ttl: int = Field(3600, validation_alias="LOCK_TTL")
 
     # --- House data source ---
     house_fd_base_url: str = Field(
