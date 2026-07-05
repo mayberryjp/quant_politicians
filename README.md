@@ -9,7 +9,8 @@ filings **since the last run**:
 
 - **House** (`app/services/house_worker.py`) - annual ZIP/XML index -> filing PDFs.
   Spec: issue #1.
-- **Senate** (planned) - eFD search endpoint -> HTML/PDF reports. Spec: issue #2.
+- **Senate** (`app/services/senate_worker.py`) - eFD search endpoint -> HTML/PDF reports.
+  Spec: issue #2.
 
 Both share one core: vision-LLM OCR + structured extraction, ticker validation, and the
 `quant_signals` producer contract.
@@ -27,6 +28,10 @@ python3 -m app.services.house_worker --once
 
 # Run the House worker on a schedule
 python3 -m app.services.house_worker --schedule 3600
+
+# Run the Senate worker (single pass / scheduled)
+python3 -m app.services.senate_worker --once
+python3 -m app.services.senate_worker --schedule 3600
 
 # Run tests
 pytest -v
