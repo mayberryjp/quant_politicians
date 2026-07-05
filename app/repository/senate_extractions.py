@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from app.models.senate import SenatePublishableExtraction
+from app.repository import row_to_dict
 
 log = logging.getLogger("quant_politicians.senate.extractions")
 
@@ -97,3 +98,31 @@ class SenateExtractionsRepository:
         )
         with self.engine.begin() as conn:
             conn.execute(sql, {"id": extraction_id, "idem": idempotency_key, "result": signal_result})
+
+    def list_extractions(self, *, report_uuid=None, ticker=None, published=None, page=1, page_size=25):
+        clauses, params = [], {}
+        if report_uuid:
+            clauses.append("report_uuid = :uuid")
+            params["uuid"] = report_uuid
+        if ticker:
+            clauses.append("ticker = :ticker")
+            params["ticker"] = ticker
+        if published is not None:
+            clauses.append("published = :pub")
+            params["pub"] = published
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        with self.engine.connect() as conn:
+            total = conn.execute(
+                text(f"SELECT count(*) FROM disclosures.senate_extractions {where}"), params
+            ).scalar_one()
+            page_params = {**params, "limit": page_size, "offset": (page - 1) * page_size}
+            rows = conn.execute(
+                text(
+                    "SELECT id, report_uuid, ticker, asset_name, transaction_type, transaction_date, "
+                    "amount_range, owner, confidence, llm_model, html_ticker, idempotency_key, published, "
+                    f"signal_result, needs_review, created_at FROM disclosures.senate_extractions {where} "
+                    "ORDER BY created_at DESC, id LIMIT :limit OFFSET :offset"
+                ),
+                page_params,
+            ).mappings().all()
+        return [row_to_dict(r) for r in rows], total

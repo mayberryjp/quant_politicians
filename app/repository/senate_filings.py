@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from app.models.senate import SenateFiling
+from app.repository import row_to_dict
 
 log = logging.getLogger("quant_politicians.senate.repo")
 
@@ -115,3 +116,39 @@ class SenateFilingsRepository:
         )
         with self.engine.begin() as conn:
             conn.execute(sql, {"uuid": report_uuid})
+
+    def list_filings(self, *, status=None, report_type=None, is_paper=None, page=1, page_size=25):
+        clauses, params = [], {}
+        if status:
+            clauses.append("status = :status")
+            params["status"] = status
+        if report_type:
+            clauses.append("report_type = :rt")
+            params["rt"] = report_type
+        if is_paper is not None:
+            clauses.append("is_paper = :ip")
+            params["ip"] = is_paper
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        with self.engine.connect() as conn:
+            total = conn.execute(
+                text(f"SELECT count(*) FROM disclosures.senate_filings {where}"), params
+            ).scalar_one()
+            page_params = {**params, "limit": page_size, "offset": (page - 1) * page_size}
+            rows = conn.execute(
+                text(
+                    "SELECT report_uuid, first_name, last_name, state, filer_type, report_type, "
+                    "filed_date, report_url, is_paper, status, content_sha256, page_count, "
+                    f"fetch_attempts, last_error, first_seen_at, updated_at FROM disclosures.senate_filings {where} "
+                    "ORDER BY filed_date DESC NULLS LAST, report_uuid LIMIT :limit OFFSET :offset"
+                ),
+                page_params,
+            ).mappings().all()
+        return [row_to_dict(r) for r in rows], total
+
+    def get_filing(self, report_uuid: str):
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM disclosures.senate_filings WHERE report_uuid = :uuid"),
+                {"uuid": report_uuid},
+            ).mappings().first()
+        return row_to_dict(row) if row else None
