@@ -29,14 +29,16 @@ from app.repository.senate_filings import SenateFilingsRepository
 from app.services.senate_documents import retrieve_reports
 from app.services.senate_efd import EfdSession
 from app.services.senate_extract import extract_reports
+from app.services.senate_publish import publish_signals
 from app.services.senate_search import run_search_ingest_cycle
 from app.services.ollama_client import OllamaClient
+from app.services.signals_client import SignalsClient
 
 WORKER = "senate"
 logger = logging.getLogger("quant_politicians.senate")
 
 
-def run_cycle(state_repo: StateRepository, *, session=None, filings_repo=None, extractions_repo=None, llm=None, now=None) -> None:
+def run_cycle(state_repo: StateRepository, *, session=None, filings_repo=None, extractions_repo=None, llm=None, signals_client=None, now=None) -> None:
     """Heartbeat, then (when a session + filings repo are provided) run eFD search
     ingestion. With no deps the cycle is heartbeat-only (Slice 0 behavior / no DB)."""
     state_repo.set_heartbeat(WORKER)
@@ -66,6 +68,16 @@ def run_cycle(state_repo: StateRepository, *, session=None, filings_repo=None, e
                     "senate extraction: docs=%d trades=%d mismatches=%d failed=%d",
                     extraction.extracted_docs, extraction.trades, extraction.mismatches, extraction.failed,
                 )
+            if extractions_repo is not None and signals_client is not None:
+                publish = publish_signals(
+                    extractions_repo=extractions_repo, state_repo=state_repo,
+                    signals_client=signals_client,
+                )
+                logger.info(
+                    "senate publish: considered=%d posted=%d duplicate=%d unresolved=%d failed=%d",
+                    publish.considered, publish.posted, publish.duplicate,
+                    publish.unresolved, publish.failed,
+                )
         else:
             logger.info("no session/filings repo provided; heartbeat-only cycle")
     except Exception:
@@ -79,6 +91,13 @@ def _build_llm():
         logger.warning("OLLAMA_MODEL not set; extraction disabled")
         return None
     return OllamaClient(settings.ollama_url, settings.ollama_model, settings.ollama_timeout)
+
+
+def _build_signals_client():
+    if not settings.signals_api_url:
+        logger.warning("SIGNALS_API_URL not set; publishing disabled")
+        return None
+    return SignalsClient(settings.signals_api_url, settings.signals_timeout)
 
 
 def _execute_cycle() -> None:
@@ -98,6 +117,7 @@ def _execute_cycle() -> None:
             filings_repo=SenateFilingsRepository(engine),
             extractions_repo=SenateExtractionsRepository(engine),
             llm=_build_llm(),
+            signals_client=_build_signals_client(),
         )
     finally:
         state_repo.release_lock(WORKER)

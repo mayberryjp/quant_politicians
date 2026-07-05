@@ -21,3 +21,22 @@ class SenateFiling(BaseModel):
     is_paper: bool = False
     status: str = "new"
     schema_version: int = 1
+
+
+class SenatePublishableExtraction(BaseModel):
+    """A joined Senate extraction + filing row ready to be published as a signal."""
+
+    id: int
+    report_uuid: str
+    ticker: str
+    transaction_type: str = ""
+    transaction_date: str | None = None
+    amount_range: str | None = None
+    owner: str | None = None
+    llm_model: str | None = None
+    first: str = ""
+    last: str = ""
+    state: str | None = None
+    filer_type: str | None = None
+    filed_date: str | None = None
+    is_paper: bool = False

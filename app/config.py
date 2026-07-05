@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     senate_backfill_start_date: str = Field("", validation_alias="SENATE_BACKFILL_START_DATE")
     senate_search_page_size: int = Field(100, validation_alias="SENATE_SEARCH_PAGE_SIZE")
     senate_request_delay: float = Field(2.0, validation_alias="SENATE_REQUEST_DELAY")
+    senate_signals_source_name: str = Field(
+        "senate-disclosures-v1", validation_alias="SENATE_SIGNALS_SOURCE_NAME"
+    )
 
     def parsed_target_filing_types(self) -> list[str]:
         return [t.strip().upper() for t in self.target_filing_types.split(",") if t.strip()]
