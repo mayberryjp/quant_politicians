@@ -27,7 +27,9 @@ from app.repository.house_filings import HouseFilingsRepository
 from app.services.house_documents import retrieve_documents
 from app.services.house_extract import extract_documents
 from app.services.house_index import run_house_ingest_cycle
+from app.services.house_publish import publish_signals
 from app.services.ollama_client import OllamaClient
+from app.services.signals_client import SignalsClient
 
 WORKER = "house"
 logger = logging.getLogger("quant_politicians.house")
@@ -39,6 +41,7 @@ def run_cycle(
     filings_repo=None,
     extractions_repo=None,
     llm=None,
+    signals_client=None,
     download_fn=None,
     cache_dir=None,
     now=None,
@@ -80,6 +83,18 @@ def run_cycle(
                 )
             else:
                 logger.info("extraction skipped (OLLAMA_MODEL / extractions repo unavailable)")
+            if extractions_repo is not None and signals_client is not None:
+                publish = publish_signals(
+                    extractions_repo=extractions_repo, state_repo=state_repo,
+                    signals_client=signals_client,
+                )
+                logger.info(
+                    "house publish: considered=%d posted=%d duplicate=%d unresolved=%d failed=%d",
+                    publish.considered, publish.posted, publish.duplicate,
+                    publish.unresolved, publish.failed,
+                )
+            else:
+                logger.info("publishing skipped (SIGNALS_API_URL unavailable)")
     except Exception:
         state_repo.incr_counter(WORKER, "failed")
         logger.exception("house cycle failed")
@@ -91,6 +106,13 @@ def _build_llm():
         logger.warning("OLLAMA_MODEL not set; extraction disabled")
         return None
     return OllamaClient(settings.ollama_url, settings.ollama_model, settings.ollama_timeout)
+
+
+def _build_signals_client():
+    if not settings.signals_api_url:
+        logger.warning("SIGNALS_API_URL not set; publishing disabled")
+        return None
+    return SignalsClient(settings.signals_api_url, settings.signals_timeout)
 
 
 def _execute_cycle() -> None:
@@ -105,6 +127,7 @@ def _execute_cycle() -> None:
         filings_repo=HouseFilingsRepository(engine),
         extractions_repo=HouseExtractionsRepository(engine),
         llm=_build_llm(),
+        signals_client=_build_signals_client(),
         cache_dir=Path(settings.doc_cache_dir),
     )
 

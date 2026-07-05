@@ -57,3 +57,20 @@ class ExtractedTrade(BaseModel):
     @classmethod
     def _normalize_type(cls, value):
         return str(value).strip().lower() if value is not None else ""
+
+
+class PublishableExtraction(BaseModel):
+    """A joined extraction + filing row ready to be published as a signal."""
+
+    id: int
+    doc_id: str
+    ticker: str
+    transaction_type: str = ""
+    transaction_date: str | None = None
+    amount_range: str | None = None
+    owner: str | None = None
+    llm_model: str | None = None
+    first: str = ""
+    last: str = ""
+    state_dst: str | None = None
+    filing_date: str | None = None
