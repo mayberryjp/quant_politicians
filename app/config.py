@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     # --- quant_signals producer ---
     signals_api_url: str = Field("", validation_alias="SIGNALS_API_URL")
     signals_source_name: str = Field("house-disclosures-v1", validation_alias="SIGNALS_SOURCE_NAME")
+    signals_timeout: float = Field(30.0, validation_alias="SIGNALS_TIMEOUT")
+    signal_market: str = Field("stocks", validation_alias="SIGNAL_MARKET")
+    signal_locale: str = Field("us", validation_alias="SIGNAL_LOCALE")
+    signal_type: str = Field("watchlist_candidate", validation_alias="SIGNAL_TYPE")
+    publish_batch_size: int = Field(50, validation_alias="PUBLISH_BATCH_SIZE")
 
     # --- HTTP / limits ---
     http_user_agent: str = Field(
