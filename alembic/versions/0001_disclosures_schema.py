@@ -1,6 +1,6 @@
 """0001 - disclosures schema.
 
-Creates the ``disclosures`` Postgres schema that later slices populate with
+Creates the ``politicians`` Postgres schema that later slices populate with
 ``house_filings`` / ``house_extractions`` (Slice 1+) and the Senate tables
 (issue #2). Slice 0 only establishes the schema so ``alembic upgrade head`` is
 meaningful in the supervised startup path.
@@ -18,8 +18,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("CREATE SCHEMA IF NOT EXISTS disclosures")
+    op.execute("CREATE SCHEMA IF NOT EXISTS politicians")
 
 
 def downgrade() -> None:
-    op.execute("DROP SCHEMA IF EXISTS disclosures CASCADE")
+    op.execute("DROP SCHEMA IF EXISTS politicians CASCADE")

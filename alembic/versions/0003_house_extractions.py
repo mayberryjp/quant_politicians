@@ -21,9 +21,9 @@ depends_on = None
 def upgrade() -> None:
     op.execute(
         """
-        CREATE TABLE disclosures.house_extractions (
+        CREATE TABLE politicians.house_extractions (
             id                SERIAL PRIMARY KEY,
-            doc_id            TEXT NOT NULL REFERENCES disclosures.house_filings(doc_id),
+            doc_id            TEXT NOT NULL REFERENCES politicians.house_filings(doc_id),
             ticker            TEXT,
             asset_name        TEXT NOT NULL DEFAULT '',
             transaction_type  TEXT NOT NULL DEFAULT '',
@@ -43,10 +43,10 @@ def upgrade() -> None:
         )
         """
     )
-    op.execute("CREATE INDEX idx_house_extractions_doc_id ON disclosures.house_extractions (doc_id)")
-    op.execute("CREATE INDEX idx_house_extractions_ticker ON disclosures.house_extractions (ticker)")
-    op.execute("CREATE INDEX idx_house_extractions_published ON disclosures.house_extractions (published)")
+    op.execute("CREATE INDEX idx_house_extractions_doc_id ON politicians.house_extractions (doc_id)")
+    op.execute("CREATE INDEX idx_house_extractions_ticker ON politicians.house_extractions (ticker)")
+    op.execute("CREATE INDEX idx_house_extractions_published ON politicians.house_extractions (published)")
 
 
 def downgrade() -> None:
-    op.execute("DROP TABLE IF EXISTS disclosures.house_extractions")
+    op.execute("DROP TABLE IF EXISTS politicians.house_extractions")

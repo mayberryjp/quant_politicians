@@ -15,7 +15,7 @@ log = logging.getLogger("quant_politicians.senate.extractions")
 
 _INSERT = text(
     """
-    INSERT INTO disclosures.senate_extractions (
+    INSERT INTO politicians.senate_extractions (
         report_uuid, ticker, asset_name, transaction_type, transaction_date,
         amount_range, owner, confidence, raw_json, llm_model, html_ticker, needs_review
     ) VALUES (
@@ -66,8 +66,8 @@ class SenateExtractionsRepository:
             SELECT e.id, e.report_uuid, e.ticker, e.transaction_type, e.transaction_date,
                    e.amount_range, e.owner, e.llm_model,
                    f.first_name, f.last_name, f.state, f.filer_type, f.filed_date, f.is_paper
-            FROM disclosures.senate_extractions e
-            JOIN disclosures.senate_filings f ON f.report_uuid = e.report_uuid
+            FROM politicians.senate_extractions e
+            JOIN politicians.senate_filings f ON f.report_uuid = e.report_uuid
             WHERE e.published = FALSE AND e.ticker IS NOT NULL
               AND e.transaction_type = ANY(:types)
             ORDER BY e.created_at ASC
@@ -91,7 +91,7 @@ class SenateExtractionsRepository:
     def mark_published(self, extraction_id: int, idempotency_key: str, signal_result: str) -> None:
         sql = text(
             """
-            UPDATE disclosures.senate_extractions
+            UPDATE politicians.senate_extractions
             SET published = TRUE, idempotency_key = :idem, signal_result = :result
             WHERE id = :id
             """
@@ -113,14 +113,14 @@ class SenateExtractionsRepository:
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         with self.engine.connect() as conn:
             total = conn.execute(
-                text(f"SELECT count(*) FROM disclosures.senate_extractions {where}"), params
+                text(f"SELECT count(*) FROM politicians.senate_extractions {where}"), params
             ).scalar_one()
             page_params = {**params, "limit": page_size, "offset": (page - 1) * page_size}
             rows = conn.execute(
                 text(
                     "SELECT id, report_uuid, ticker, asset_name, transaction_type, transaction_date, "
                     "amount_range, owner, confidence, llm_model, html_ticker, idempotency_key, published, "
-                    f"signal_result, needs_review, created_at FROM disclosures.senate_extractions {where} "
+                    f"signal_result, needs_review, created_at FROM politicians.senate_extractions {where} "
                     "ORDER BY created_at DESC, id LIMIT :limit OFFSET :offset"
                 ),
                 page_params,

@@ -14,7 +14,7 @@ log = logging.getLogger("quant_politicians.house.repo")
 
 _UPSERT = text(
     """
-    INSERT INTO disclosures.house_filings (
+    INSERT INTO politicians.house_filings (
         doc_id, prefix, last_name, first_name, suffix,
         filing_type, state_dst, year, filing_date, status
     ) VALUES (
@@ -51,7 +51,7 @@ class HouseFilingsRepository:
         self.engine = engine
 
     def get_seen_doc_ids(self, year: int) -> set[str]:
-        sql = text("SELECT doc_id FROM disclosures.house_filings WHERE year = :year")
+        sql = text("SELECT doc_id FROM politicians.house_filings WHERE year = :year")
         with self.engine.connect() as conn:
             return set(conn.execute(sql, {"year": year}).scalars().all())
 
@@ -69,7 +69,7 @@ class HouseFilingsRepository:
         sql = text(
             """
             SELECT doc_id, year, filing_type
-            FROM disclosures.house_filings
+            FROM politicians.house_filings
             WHERE status = 'new' AND filing_type = ANY(:types)
             ORDER BY filing_date DESC NULLS LAST
             LIMIT :limit
@@ -85,7 +85,7 @@ class HouseFilingsRepository:
     def mark_fetched(self, doc_id: str, doc_url: str, doc_sha256: str, page_count: int) -> None:
         sql = text(
             """
-            UPDATE disclosures.house_filings
+            UPDATE politicians.house_filings
             SET status = 'fetched', doc_url = :doc_url, doc_sha256 = :sha,
                 page_count = :pages, updated_at = now()
             WHERE doc_id = :doc_id
@@ -97,7 +97,7 @@ class HouseFilingsRepository:
     def mark_failed(self, doc_id: str, error: str) -> None:
         sql = text(
             """
-            UPDATE disclosures.house_filings
+            UPDATE politicians.house_filings
             SET status = 'failed', last_error = :err,
                 fetch_attempts = fetch_attempts + 1, updated_at = now()
             WHERE doc_id = :doc_id
@@ -111,7 +111,7 @@ class HouseFilingsRepository:
         sql = text(
             """
             SELECT doc_id, doc_sha256
-            FROM disclosures.house_filings
+            FROM politicians.house_filings
             WHERE status = 'fetched'
             ORDER BY filing_date DESC NULLS LAST
             LIMIT :limit
@@ -122,7 +122,7 @@ class HouseFilingsRepository:
 
     def mark_extracted(self, doc_id: str) -> None:
         sql = text(
-            "UPDATE disclosures.house_filings SET status='extracted', updated_at=now() WHERE doc_id=:doc_id"
+            "UPDATE politicians.house_filings SET status='extracted', updated_at=now() WHERE doc_id=:doc_id"
         )
         with self.engine.begin() as conn:
             conn.execute(sql, {"doc_id": doc_id})
@@ -141,14 +141,14 @@ class HouseFilingsRepository:
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         with self.engine.connect() as conn:
             total = conn.execute(
-                text(f"SELECT count(*) FROM disclosures.house_filings {where}"), params
+                text(f"SELECT count(*) FROM politicians.house_filings {where}"), params
             ).scalar_one()
             page_params = {**params, "limit": page_size, "offset": (page - 1) * page_size}
             rows = conn.execute(
                 text(
                     "SELECT doc_id, prefix, last_name, first_name, suffix, filing_type, state_dst, "
                     "year, filing_date, status, doc_url, doc_sha256, page_count, fetch_attempts, "
-                    f"last_error, first_seen_at, updated_at FROM disclosures.house_filings {where} "
+                    f"last_error, first_seen_at, updated_at FROM politicians.house_filings {where} "
                     "ORDER BY filing_date DESC NULLS LAST, doc_id LIMIT :limit OFFSET :offset"
                 ),
                 page_params,
@@ -158,7 +158,7 @@ class HouseFilingsRepository:
     def get_filing(self, doc_id: str):
         with self.engine.connect() as conn:
             row = conn.execute(
-                text("SELECT * FROM disclosures.house_filings WHERE doc_id = :doc_id"),
+                text("SELECT * FROM politicians.house_filings WHERE doc_id = :doc_id"),
                 {"doc_id": doc_id},
             ).mappings().first()
         return row_to_dict(row) if row else None

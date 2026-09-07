@@ -15,7 +15,7 @@ log = logging.getLogger("quant_politicians.house.extractions")
 
 _INSERT = text(
     """
-    INSERT INTO disclosures.house_extractions (
+    INSERT INTO politicians.house_extractions (
         doc_id, ticker, asset_name, transaction_type, transaction_date,
         amount_range, owner, confidence, raw_json, llm_model, needs_review
     ) VALUES (
@@ -63,8 +63,8 @@ class HouseExtractionsRepository:
             SELECT e.id, e.doc_id, e.ticker, e.transaction_type, e.transaction_date,
                    e.amount_range, e.owner, e.llm_model,
                    f.first_name, f.last_name, f.state_dst, f.filing_date
-            FROM disclosures.house_extractions e
-            JOIN disclosures.house_filings f ON f.doc_id = e.doc_id
+            FROM politicians.house_extractions e
+            JOIN politicians.house_filings f ON f.doc_id = e.doc_id
             WHERE e.published = FALSE AND e.ticker IS NOT NULL
               AND e.transaction_type = ANY(:types)
             ORDER BY e.created_at ASC
@@ -87,7 +87,7 @@ class HouseExtractionsRepository:
     def mark_published(self, extraction_id: int, idempotency_key: str, signal_result: str) -> None:
         sql = text(
             """
-            UPDATE disclosures.house_extractions
+            UPDATE politicians.house_extractions
             SET published = TRUE, idempotency_key = :idem, signal_result = :result
             WHERE id = :id
             """
@@ -109,14 +109,14 @@ class HouseExtractionsRepository:
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         with self.engine.connect() as conn:
             total = conn.execute(
-                text(f"SELECT count(*) FROM disclosures.house_extractions {where}"), params
+                text(f"SELECT count(*) FROM politicians.house_extractions {where}"), params
             ).scalar_one()
             page_params = {**params, "limit": page_size, "offset": (page - 1) * page_size}
             rows = conn.execute(
                 text(
                     "SELECT id, doc_id, ticker, asset_name, transaction_type, transaction_date, "
                     "amount_range, owner, confidence, llm_model, idempotency_key, published, "
-                    f"signal_result, needs_review, created_at FROM disclosures.house_extractions {where} "
+                    f"signal_result, needs_review, created_at FROM politicians.house_extractions {where} "
                     "ORDER BY created_at DESC, id LIMIT :limit OFFSET :offset"
                 ),
                 page_params,

@@ -21,7 +21,7 @@ depends_on = None
 def upgrade() -> None:
     op.execute(
         """
-        CREATE TABLE disclosures.senate_filings (
+        CREATE TABLE politicians.senate_filings (
             report_uuid     TEXT PRIMARY KEY,
             first_name      TEXT NOT NULL DEFAULT '',
             last_name       TEXT NOT NULL DEFAULT '',
@@ -42,15 +42,15 @@ def upgrade() -> None:
         )
         """
     )
-    op.execute("CREATE INDEX idx_senate_filings_status ON disclosures.senate_filings (status)")
-    op.execute("CREATE INDEX idx_senate_filings_report_type ON disclosures.senate_filings (report_type)")
-    op.execute("CREATE INDEX idx_senate_filings_filed_date ON disclosures.senate_filings (filed_date)")
+    op.execute("CREATE INDEX idx_senate_filings_status ON politicians.senate_filings (status)")
+    op.execute("CREATE INDEX idx_senate_filings_report_type ON politicians.senate_filings (report_type)")
+    op.execute("CREATE INDEX idx_senate_filings_filed_date ON politicians.senate_filings (filed_date)")
 
     op.execute(
         """
-        CREATE TABLE disclosures.senate_extractions (
+        CREATE TABLE politicians.senate_extractions (
             id                SERIAL PRIMARY KEY,
-            report_uuid       TEXT NOT NULL REFERENCES disclosures.senate_filings(report_uuid),
+            report_uuid       TEXT NOT NULL REFERENCES politicians.senate_filings(report_uuid),
             ticker            TEXT,
             asset_name        TEXT NOT NULL DEFAULT '',
             transaction_type  TEXT NOT NULL DEFAULT '',
@@ -71,11 +71,11 @@ def upgrade() -> None:
         )
         """
     )
-    op.execute("CREATE INDEX idx_senate_extractions_report_uuid ON disclosures.senate_extractions (report_uuid)")
-    op.execute("CREATE INDEX idx_senate_extractions_ticker ON disclosures.senate_extractions (ticker)")
-    op.execute("CREATE INDEX idx_senate_extractions_published ON disclosures.senate_extractions (published)")
+    op.execute("CREATE INDEX idx_senate_extractions_report_uuid ON politicians.senate_extractions (report_uuid)")
+    op.execute("CREATE INDEX idx_senate_extractions_ticker ON politicians.senate_extractions (ticker)")
+    op.execute("CREATE INDEX idx_senate_extractions_published ON politicians.senate_extractions (published)")
 
 
 def downgrade() -> None:
-    op.execute("DROP TABLE IF EXISTS disclosures.senate_extractions")
-    op.execute("DROP TABLE IF EXISTS disclosures.senate_filings")
+    op.execute("DROP TABLE IF EXISTS politicians.senate_extractions")
+    op.execute("DROP TABLE IF EXISTS politicians.senate_filings")

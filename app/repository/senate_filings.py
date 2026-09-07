@@ -14,7 +14,7 @@ log = logging.getLogger("quant_politicians.senate.repo")
 
 _UPSERT = text(
     """
-    INSERT INTO disclosures.senate_filings (
+    INSERT INTO politicians.senate_filings (
         report_uuid, first_name, last_name, state, filer_type,
         report_type, filed_date, report_url, is_paper, status
     ) VALUES (
@@ -50,7 +50,7 @@ class SenateFilingsRepository:
         self.engine = engine
 
     def get_seen_report_uuids(self) -> set[str]:
-        sql = text("SELECT report_uuid FROM disclosures.senate_filings")
+        sql = text("SELECT report_uuid FROM politicians.senate_filings")
         with self.engine.connect() as conn:
             return set(conn.execute(sql).scalars().all())
 
@@ -65,7 +65,7 @@ class SenateFilingsRepository:
         sql = text(
             """
             SELECT report_uuid, report_url, is_paper
-            FROM disclosures.senate_filings
+            FROM politicians.senate_filings
             WHERE status = 'new' AND report_url IS NOT NULL
             ORDER BY filed_date DESC NULLS LAST
             LIMIT :limit
@@ -77,7 +77,7 @@ class SenateFilingsRepository:
     def mark_fetched(self, report_uuid: str, content_sha256: str, page_count) -> None:
         sql = text(
             """
-            UPDATE disclosures.senate_filings
+            UPDATE politicians.senate_filings
             SET status = 'fetched', content_sha256 = :sha, page_count = :pages, updated_at = now()
             WHERE report_uuid = :uuid
             """
@@ -88,7 +88,7 @@ class SenateFilingsRepository:
     def mark_failed(self, report_uuid: str, error: str) -> None:
         sql = text(
             """
-            UPDATE disclosures.senate_filings
+            UPDATE politicians.senate_filings
             SET status = 'failed', last_error = :err,
                 fetch_attempts = fetch_attempts + 1, updated_at = now()
             WHERE report_uuid = :uuid
@@ -101,7 +101,7 @@ class SenateFilingsRepository:
         sql = text(
             """
             SELECT report_uuid, content_sha256, is_paper
-            FROM disclosures.senate_filings
+            FROM politicians.senate_filings
             WHERE status = 'fetched'
             ORDER BY filed_date DESC NULLS LAST
             LIMIT :limit
@@ -112,7 +112,7 @@ class SenateFilingsRepository:
 
     def mark_extracted(self, report_uuid: str) -> None:
         sql = text(
-            "UPDATE disclosures.senate_filings SET status='extracted', updated_at=now() WHERE report_uuid=:uuid"
+            "UPDATE politicians.senate_filings SET status='extracted', updated_at=now() WHERE report_uuid=:uuid"
         )
         with self.engine.begin() as conn:
             conn.execute(sql, {"uuid": report_uuid})
@@ -131,14 +131,14 @@ class SenateFilingsRepository:
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         with self.engine.connect() as conn:
             total = conn.execute(
-                text(f"SELECT count(*) FROM disclosures.senate_filings {where}"), params
+                text(f"SELECT count(*) FROM politicians.senate_filings {where}"), params
             ).scalar_one()
             page_params = {**params, "limit": page_size, "offset": (page - 1) * page_size}
             rows = conn.execute(
                 text(
                     "SELECT report_uuid, first_name, last_name, state, filer_type, report_type, "
                     "filed_date, report_url, is_paper, status, content_sha256, page_count, "
-                    f"fetch_attempts, last_error, first_seen_at, updated_at FROM disclosures.senate_filings {where} "
+                    f"fetch_attempts, last_error, first_seen_at, updated_at FROM politicians.senate_filings {where} "
                     "ORDER BY filed_date DESC NULLS LAST, report_uuid LIMIT :limit OFFSET :offset"
                 ),
                 page_params,
@@ -148,7 +148,7 @@ class SenateFilingsRepository:
     def get_filing(self, report_uuid: str):
         with self.engine.connect() as conn:
             row = conn.execute(
-                text("SELECT * FROM disclosures.senate_filings WHERE report_uuid = :uuid"),
+                text("SELECT * FROM politicians.senate_filings WHERE report_uuid = :uuid"),
                 {"uuid": report_uuid},
             ).mappings().first()
         return row_to_dict(row) if row else None
